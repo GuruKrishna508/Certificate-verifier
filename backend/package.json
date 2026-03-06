@@ -1,8 +1,11 @@
 {
   "name": "certificate-verifier-backend",
-  "version": "2.0.0",
-  "description": "Backend for verifying online course certificates using Puppeteer",
+  "version": "1.0.0",
+  "description": "Certificate verifier backend with Puppeteer",
   "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node server.js"
   },
