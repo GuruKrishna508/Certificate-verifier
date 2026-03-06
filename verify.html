@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Certificate Verifier</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg: #0b0f1a; --card: #111827; --border: #1e2d40;
+  --accent: #00e5ff; --accent2: #7c3aed;
+  --green: #10b981; --red: #ef4444; --yellow: #f59e0b;
+  --text: #e2e8f0; --muted: #64748b;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: 'Syne', sans-serif;
+  min-height: 100vh; display: flex; flex-direction: column;
+  align-items: center; padding: 40px 20px 80px;
+}
+body::before {
+  content:''; position:fixed; inset:0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px; pointer-events:none; z-index:0;
+}
+.container { position:relative; z-index:1; width:100%; max-width:760px; }
+
+header { text-align:center; margin-bottom:40px; }
+.badge {
+  display:inline-block;
+  background:linear-gradient(135deg,#00e5ff22,#7c3aed22);
+  border:1px solid #00e5ff44; color:var(--accent);
+  font-family:'DM Mono',monospace; font-size:11px;
+  letter-spacing:3px; padding:6px 16px; border-radius:20px;
+  margin-bottom:20px; text-transform:uppercase;
+}
+h1 {
+  font-size:clamp(1.8rem,5vw,3rem); font-weight:800; line-height:1.1;
+  background:linear-gradient(135deg,#fff 0%,var(--accent) 60%,var(--accent2) 100%);
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+  background-clip:text; margin-bottom:12px;
+}
+.subtitle { color:var(--muted); font-size:14px; line-height:1.6; }
+
+/* Tabs */
+.tabs { display:flex; gap:4px; background:#111827; border:1px solid var(--border);
+  border-radius:14px; padding:4px; margin-bottom:28px; }
+.tab {
+  flex:1; padding:10px; text-align:center; border-radius:10px;
+  cursor:pointer; font-size:13px; font-weight:600; letter-spacing:0.5px;
+  transition:all 0.2s; color:var(--muted); border:none; background:transparent;
+  font-family:'Syne',sans-serif;
+}
+.tab.active { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#fff; }
+
+/* Card */
+.card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:20px; padding:32px; margin-bottom:20px;
+  position:relative; overflow:hidden;
+}
+.card::before {
+  content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  background:linear-gradient(90deg,transparent,var(--accent),var(--accent2),transparent);
+}
+.tab-panel { display:none; }
+.tab-panel.active { display:block; }
+
+.field-label {
+  font-size:11px; letter-spacing:2px; text-transform:uppercase;
+  color:var(--muted); font-family:'DM Mono',monospace; margin-bottom:8px;
+}
+input[type=text], input[type=url] {
+  width:100%; background:#0b0f1a; border:1px solid var(--border);
+  border-radius:10px; color:var(--text); font-family:'DM Mono',monospace;
+  font-size:14px; padding:13px 16px; outline:none; margin-bottom:20px;
+  transition:border-color 0.2s, box-shadow 0.2s;
+}
+input:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(0,229,255,0.1); }
+input::placeholder { color:#2d3748; }
+
+/* File upload zone */
+.upload-zone {
+  border:2px dashed var(--border); border-radius:14px;
+  padding:40px 20px; text-align:center; cursor:pointer;
+  transition:all 0.2s; margin-bottom:20px; position:relative;
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color:var(--accent); background:#00e5ff08;
+}
+.upload-zone input[type=file] {
+  position:absolute; inset:0; opacity:0; cursor:pointer;
+  margin:0; padding:0; height:100%; width:100%;
+}
+.upload-icon { font-size:32px; margin-bottom:10px; }
+.upload-text { color:var(--muted); font-size:14px; }
+.upload-text strong { color:var(--accent); }
+.file-info { font-family:'DM Mono',monospace; font-size:12px; color:var(--green); margin-top:8px; }
+
+.template-link {
+  font-size:12px; font-family:'DM Mono',monospace;
+  color:var(--accent); text-decoration:none; display:inline-block; margin-bottom:20px;
+}
+.template-link:hover { text-decoration:underline; }
+
+/* Button */
+.verify-btn {
+  width:100%; padding:15px; border:none; border-radius:12px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  color:#fff; font-family:'Syne',sans-serif; font-size:15px;
+  font-weight:700; letter-spacing:1px; cursor:pointer;
+  transition:opacity 0.2s, transform 0.1s; text-transform:uppercase;
+}
+.verify-btn:hover { opacity:0.9; }
+.verify-btn:active { transform:scale(0.99); }
+.verify-btn:disabled { opacity:0.4; cursor:not-allowed; }
+
+/* Results */
+.results { display:none; animation:slideUp 0.4s ease; }
+.results.show { display:block; }
+@keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+.result-header { display:flex; align-items:center; gap:14px; margin-bottom:24px; }
+.result-icon {
+  width:52px; height:52px; border-radius:14px;
+  display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0;
+}
+.result-icon.pass { background:#10b98122; border:1px solid #10b98144; }
+.result-icon.fail { background:#ef444422; border:1px solid #ef444444; }
+.result-icon.warn { background:#f59e0b22; border:1px solid #f59e0b44; }
+.result-title { font-size:19px; font-weight:700; }
+.result-sub { font-size:12px; color:var(--muted); margin-top:4px; font-family:'DM Mono',monospace; }
+
+.divider { border:none; border-top:1px solid var(--border); margin:20px 0; }
+
+.checks { display:flex; flex-direction:column; gap:10px; }
+.check-row {
+  display:flex; align-items:flex-start; gap:12px;
+  background:#0b0f1a; border:1px solid var(--border);
+  border-radius:12px; padding:14px 16px;
+}
+.check-dot {
+  width:26px; height:26px; border-radius:7px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; flex-shrink:0; margin-top:1px;
+}
+.check-dot.pass { background:#10b98122; color:var(--green); border:1px solid #10b98133; }
+.check-dot.fail { background:#ef444422; color:var(--red); border:1px solid #ef444433; }
+.check-dot.warn { background:#f59e0b22; color:var(--yellow); border:1px solid #f59e0b33; }
+.check-dot.loading { background:#1e2d40; }
+
+.check-name { font-size:13px; font-weight:600; margin-bottom:3px; }
+.check-detail { font-size:12px; font-family:'DM Mono',monospace; color:var(--muted); line-height:1.5; }
+.check-detail.pass { color:var(--green); }
+.check-detail.fail { color:var(--red); }
+.check-detail.warn { color:var(--yellow); }
+
+.spinner { display:inline-block; width:14px; height:14px; border:2px solid #1e2d40; border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+/* Bulk results table */
+.bulk-summary {
+  display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px;
+}
+.sum-card {
+  background:#0b0f1a; border:1px solid var(--border); border-radius:12px;
+  padding:16px; text-align:center;
+}
+.sum-num { font-size:28px; font-weight:800; }
+.sum-num.pass { color:var(--green); }
+.sum-num.fail { color:var(--red); }
+.sum-num.warn { color:var(--yellow); }
+.sum-num.total { color:var(--accent); }
+.sum-label { font-size:11px; color:var(--muted); font-family:'DM Mono',monospace; letter-spacing:1px; }
+
+.bulk-table-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th {
+  text-align:left; padding:10px 14px;
+  background:#0b0f1a; border-bottom:1px solid var(--border);
+  font-family:'DM Mono',monospace; font-size:11px; letter-spacing:1px;
+  color:var(--muted); text-transform:uppercase;
+}
+td {
+  padding:10px 14px; border-bottom:1px solid #1e2d4066;
+  font-family:'DM Mono',monospace; font-size:12px; line-height:1.5;
+}
+tr:last-child td { border-bottom:none; }
+tr:hover td { background:#ffffff05; }
+.verdict-badge {
+  display:inline-block; padding:3px 10px; border-radius:6px;
+  font-size:11px; font-weight:600; letter-spacing:1px; text-transform:uppercase;
+}
+.verdict-badge.pass { background:#10b98122; color:var(--green); border:1px solid #10b98133; }
+.verdict-badge.fail { background:#ef444422; color:var(--red); border:1px solid #ef444433; }
+.verdict-badge.warn { background:#f59e0b22; color:var(--yellow); border:1px solid #f59e0b33; }
+
+.info-note {
+  background:#00e5ff08; border:1px solid #00e5ff22; border-radius:12px;
+  padding:14px 16px; font-size:12px; color:var(--muted);
+  line-height:1.7; margin-top:16px; font-family:'DM Mono',monospace;
+}
+.info-note strong { color:var(--accent); }
+
+.server-status {
+  display:flex; align-items:center; gap:8px; justify-content:center;
+  font-size:12px; font-family:'DM Mono',monospace; color:var(--muted);
+  margin-bottom:24px;
+}
+.status-dot { width:8px; height:8px; border-radius:50%; background:var(--muted); }
+.status-dot.online { background:var(--green); box-shadow:0 0 6px var(--green); }
+.status-dot.offline { background:var(--red); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="badge">🔍 Certificate Validator</div>
+    <h1>Verify Course<br/>Certificates</h1>
+    <p class="subtitle">Fetches the certificate page and extracts the name automatically.<br/>Supports Coursera, Udemy, edX, LinkedIn Learning, NPTEL & more.</p>
+  </header>
+
+  <div class="server-status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Checking backend connection…</span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('single')">Single Certificate</button>
+    <button class="tab" onclick="switchTab('bulk')">Bulk Verify (Excel/CSV)</button>
+  </div>
+
+  <!-- ── Single ── -->
+  <div class="card">
+    <div id="panel-single" class="tab-panel active">
+      <div class="field-label">Certificate URL</div>
+      <input type="url" id="certUrl" placeholder="https://www.coursera.org/verify/XXXXXXXXXX"/>
+      <div class="field-label">Expected Name</div>
+      <input type="text" id="expectedName" placeholder="Enter the student's full name"/>
+      <button class="verify-btn" id="singleBtn" onclick="verifySingle()">✦ Verify Certificate</button>
+    </div>
+
+    <div id="panel-bulk" class="tab-panel">
+      <a class="template-link" href="#" onclick="downloadTemplate()">⬇ Download Excel Template</a>
+      <div class="upload-zone" id="dropZone">
+        <input type="file" id="bulkFile" accept=".xlsx,.xls,.csv" onchange="onFileSelected(event)"/>
+        <div class="upload-icon">📂</div>
+        <div class="upload-text">Drop your <strong>Excel or CSV</strong> file here, or click to browse</div>
+        <div class="file-info" id="fileInfo"></div>
+      </div>
+      <button class="verify-btn" id="bulkBtn" onclick="verifyBulk()">✦ Verify All Certificates</button>
+    </div>
+  </div>
+
+  <!-- ── Single Results ── -->
+  <div class="card results" id="singleResults">
+    <div class="result-header">
+      <div class="result-icon" id="overallIcon">⏳</div>
+      <div>
+        <div class="result-title" id="overallTitle">Verifying…</div>
+        <div class="result-sub" id="overallSub"></div>
+      </div>
+    </div>
+    <hr class="divider"/>
+    <div class="checks" id="checksList"></div>
+    <div class="info-note" id="infoNote" style="display:none"></div>
+  </div>
+
+  <!-- ── Bulk Results ── -->
+  <div class="card results" id="bulkResults">
+    <div class="result-title" style="margin-bottom:20px">Bulk Verification Results</div>
+    <div class="bulk-summary" id="bulkSummary"></div>
+    <hr class="divider"/>
+    <div class="bulk-table-wrap">
+      <table id="bulkTable">
+        <thead>
+          <tr>
+            <th>#</th><th>URL</th><th>Expected Name</th>
+            <th>Extracted Name</th><th>Match %</th><th>Verdict</th>
+          </tr>
+        </thead>
+        <tbody id="bulkTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = "http://localhost:3001/api";
+let selectedFile = null;
+
+// ─── Server health check ──────────────────────────────────────────────────────
+async function checkServer() {
+  try {
+    const r = await fetch(`${API}/health`, { signal: AbortSignal.timeout(3000) });
+    if (r.ok) {
+      document.getElementById('statusDot').className = 'status-dot online';
+      document.getElementById('statusText').textContent = 'Backend connected — ready to verify';
+      return true;
+    }
+  } catch {}
+  document.getElementById('statusDot').className = 'status-dot offline';
+  document.getElementById('statusText').textContent = 'Backend offline — start server with: node server.js';
+  return false;
+}
+checkServer();
+setInterval(checkServer, 10000);
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab').forEach((t,i) => t.classList.toggle('active', (i===0) === (tab==='single')));
+  document.getElementById('panel-single').classList.toggle('active', tab === 'single');
+  document.getElementById('panel-bulk').classList.toggle('active', tab === 'bulk');
+  document.getElementById('singleResults').classList.remove('show');
+  document.getElementById('bulkResults').classList.remove('show');
+}
+
+// ─── File selection ───────────────────────────────────────────────────────────
+function onFileSelected(e) {
+  selectedFile = e.target.files[0];
+  document.getElementById('fileInfo').textContent = selectedFile ? `✓ ${selectedFile.name}` : '';
+}
+
+// ─── Download template ────────────────────────────────────────────────────────
+function downloadTemplate() {
+  const csv = "certificate_url,expected_name\nhttps://www.coursera.org/verify/EXAMPLE1,John Doe\nhttps://www.udemy.com/certificate/EXAMPLE2,Jane Smith\n";
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'certificate_template.csv';
+  a.click();
+}
+
+// ─── Single verification ──────────────────────────────────────────────────────
+async function verifySingle() {
+  const url = document.getElementById('certUrl').value.trim();
+  const expectedName = document.getElementById('expectedName').value.trim();
+
+  if (!url || !expectedName) { alert('Please enter both the certificate URL and expected name.'); return; }
+
+  const online = await checkServer();
+  if (!online) { alert('Backend server is not running.\n\nStart it with:\n  cd backend && npm install && node server.js'); return; }
+
+  document.getElementById('singleBtn').disabled = true;
+  const resultsEl = document.getElementById('singleResults');
+  resultsEl.classList.add('show');
+  document.getElementById('checksList').innerHTML = '';
+  document.getElementById('infoNote').style.display = 'none';
+  document.getElementById('overallIcon').className = 'result-icon';
+  document.getElementById('overallIcon').textContent = '⏳';
+  document.getElementById('overallTitle').textContent = 'Verifying…';
+  document.getElementById('overallSub').textContent = 'Fetching certificate page…';
+  resultsEl.scrollIntoView({ behavior: 'smooth' });
+
+  // Show loading checks
+  addCheck('Connecting to certificate…', 'loading', '');
+
+  try {
+    const res = await fetch(`${API}/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, expectedName })
+    });
+    const data = await res.json();
+    renderSingleResult(data);
+  } catch (err) {
+    setOverall('fail', 'Request Failed', err.message);
+  }
+  document.getElementById('singleBtn').disabled = false;
+}
+
+function renderSingleResult(data) {
+  document.getElementById('checksList').innerHTML = '';
+  for (const c of data.checks) {
+    addCheck(c.name, c.status, c.detail);
+  }
+
+  const icons = { pass: '✅', fail: '❌', warn: '⚠️' };
+  const titles = {
+    pass: 'Certificate Verified ✓',
+    fail: 'Verification Failed',
+    warn: 'Verified with Warnings'
+  };
+  const subs = {
+    pass: `Valid ${data.platform || ''} certificate — name matches`,
+    fail: 'One or more checks did not pass',
+    warn: `Certificate from ${data.platform || 'platform'} — review warnings`
+  };
+
+  setOverall(data.verdict, titles[data.verdict] || 'Unknown', subs[data.verdict] || '');
+
+  if (data.verdict === 'pass') {
+    showNote(`✅ <strong>All checks passed.</strong> Certificate is from ${data.platform} and the name "${data.extractedName}" matches your expected name.`);
+  } else if (data.verdict === 'warn') {
+    showNote(`⚠️ <strong>Needs review.</strong> ${data.extractedName ? `Extracted name: "${data.extractedName}".` : 'Could not extract name from page.'} Similarity: ${data.similarity || 'N/A'}%. Open the certificate URL directly to confirm.`);
+  } else {
+    showNote(`🔴 <strong>Verification failed.</strong> ${data.extractedName ? `Certificate name: "${data.extractedName}" does not match expected "${data.expectedName}".` : 'URL may not be from a recognized platform.'}`);
+  }
+}
+
+// ─── Bulk verification ────────────────────────────────────────────────────────
+async function verifyBulk() {
+  if (!selectedFile) { alert('Please select an Excel or CSV file first.'); return; }
+
+  const online = await checkServer();
+  if (!online) { alert('Backend server is not running.\n\nStart it with:\n  cd backend && npm install && node server.js'); return; }
+
+  document.getElementById('bulkBtn').disabled = true;
+  document.getElementById('bulkBtn').textContent = '⏳ Verifying…';
+
+  const formData = new FormData();
+  formData.append('file', selectedFile);
+
+  try {
+    const res = await fetch(`${API}/verify-bulk`, { method: 'POST', body: formData });
+    const data = await res.json();
+    renderBulkResults(data);
+  } catch (err) {
+    alert('Bulk verification error: ' + err.message);
+  }
+
+  document.getElementById('bulkBtn').disabled = false;
+  document.getElementById('bulkBtn').textContent = '✦ Verify All Certificates';
+}
+
+function renderBulkResults(data) {
+  const el = document.getElementById('bulkResults');
+  el.classList.add('show');
+  el.scrollIntoView({ behavior: 'smooth' });
+
+  const s = data.summary;
+  document.getElementById('bulkSummary').innerHTML = `
+    <div class="sum-card"><div class="sum-num total">${s.total}</div><div class="sum-label">Total</div></div>
+    <div class="sum-card"><div class="sum-num pass">${s.pass}</div><div class="sum-label">Passed</div></div>
+    <div class="sum-card"><div class="sum-num warn">${s.warn}</div><div class="sum-label">Warnings</div></div>
+    <div class="sum-card"><div class="sum-num fail">${s.fail}</div><div class="sum-label">Failed</div></div>`;
+
+  const tbody = document.getElementById('bulkTableBody');
+  tbody.innerHTML = '';
+  data.results.forEach((r, i) => {
+    const urlShort = r.url ? (r.url.length > 40 ? r.url.slice(0, 40) + '…' : r.url) : '—';
+    tbody.innerHTML += `
+      <tr>
+        <td>${i + 1}</td>
+        <td title="${r.url || ''}">${urlShort}</td>
+        <td>${r.expectedName || '—'}</td>
+        <td>${r.extractedName || '—'}</td>
+        <td>${r.similarity != null ? r.similarity + '%' : '—'}</td>
+        <td><span class="verdict-badge ${r.verdict}">${r.verdict || 'skip'}</span></td>
+      </tr>`;
+  });
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function addCheck(name, status, detail) {
+  const icons = { pass: '✓', fail: '✗', warn: '⚠' };
+  const d = document.createElement('div');
+  d.className = 'check-row';
+  d.id = 'chk_' + name.replace(/\W/g,'_');
+  d.innerHTML = `
+    <div class="check-dot ${status}">${status === 'loading' ? '<span class="spinner"></span>' : (icons[status]||'')}</div>
+    <div>
+      <div class="check-name">${name}</div>
+      <div class="check-detail ${status === 'loading' ? '' : status}">${detail}</div>
+    </div>`;
+  document.getElementById('checksList').appendChild(d);
+}
+
+function setOverall(status, title, sub) {
+  const emojis = { pass: '✅', fail: '❌', warn: '⚠️' };
+  document.getElementById('overallIcon').className = `result-icon ${status}`;
+  document.getElementById('overallIcon').textContent = emojis[status] || '❓';
+  document.getElementById('overallTitle').textContent = title;
+  document.getElementById('overallSub').textContent = sub;
+}
+
+function showNote(html) {
+  const n = document.getElementById('infoNote');
+  n.style.display = 'block'; n.innerHTML = html;
+}
+</script>
+</body>
+</html>
