@@ -340,9 +340,13 @@ async function extractNameFromCertPage(url, platform) {
   try {
     browser = await puppeteer.launch({
       headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox",
-             "--disable-blink-features=AutomationControlled",
-             "--disable-dev-shm-usage", "--window-size=1280,900"]
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      args: [
+        "--no-sandbox", "--disable-setuid-sandbox",
+        "--disable-blink-features=AutomationControlled",
+        "--disable-dev-shm-usage", "--window-size=1280,900",
+        "--disable-gpu", "--single-process"
+      ]
     });
     const page = await browser.newPage();
     await page.setViewport({ width: 1280, height: 900 });
